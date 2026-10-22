@@ -1,0 +1,527 @@
+openapi: 3.0.3
+info:
+  title: SmartBudget API
+  version: 1.0.0
+  description: |
+    API REST de análisis de gastos y presupuestos inteligentes.
+
+    **Autenticación:** registra un usuario o inicia sesión y usa el token en el botón **Authorize**
+    (`Authorization: Bearer <token>`).
+
+    **Formato de errores:** `{ "error": { "code": "VALIDATION_ERROR", "message": "Ingrese un monto positivo", "details": [...], "requestId": "..." } }`
+
+    **Montos:** números con máximo 2 decimales, en pesos colombianos. **Fechas:** `YYYY-MM-DD`. **IDs:** UUID.
+servers:
+  - url: /api/v1
+tags:
+  - name: Estado
+  - name: Autenticación
+  - name: Usuarios
+  - name: Categorías
+  - name: Transacciones
+  - name: Presupuestos
+  - name: Análisis inteligente
+    description: Funcionalidad especial — medición del presupuesto, alertas, mensajes y reportes Excel.
+  - name: Estadísticas
+  - name: Predicciones
+  - name: Alertas
+  - name: Reportes
+
+security:
+  - bearerAuth: []
+
+paths:
+  /health:
+    get:
+      tags: [Estado]
+      summary: Estado del servicio y de la base de datos
+      security: []
+      responses:
+        '200': { description: Servicio operativo }
+        '503': { description: Base de datos no disponible }
+
+  /auth/register:
+    post:
+      tags: [Autenticación]
+      summary: Registrar usuario (crea categorías por defecto)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegisterInput' }
+            example: { name: Juan José Martínez, email: juan@example.com, password: Clave12345 }
+      responses:
+        '201': { description: Usuario creado, content: { application/json: { schema: { $ref: '#/components/schemas/AuthResponse' } } } }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /auth/login:
+    post:
+      tags: [Autenticación]
+      summary: Iniciar sesión y obtener el token JWT
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginInput' }
+            example: { email: demo@smartbudget.com, password: Demo12345 }
+      responses:
+        '200': { description: Sesión iniciada, content: { application/json: { schema: { $ref: '#/components/schemas/AuthResponse' } } } }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /auth/logout:
+    post:
+      tags: [Autenticación]
+      summary: Cerrar sesión (revoca todos los tokens del usuario)
+      responses:
+        '200': { description: Sesión cerrada }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /auth/me:
+    get:
+      tags: [Autenticación]
+      summary: Usuario autenticado
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/User' } } } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /users/me:
+    get:
+      tags: [Usuarios]
+      summary: Ver perfil
+      responses:
+        '200': { description: OK }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    patch:
+      tags: [Usuarios]
+      summary: Actualizar nombre
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [name], properties: { name: { type: string } } } } }
+      responses:
+        '200': { description: Actualizado }
+        '400': { $ref: '#/components/responses/ValidationError' }
+    delete:
+      tags: [Usuarios]
+      summary: Eliminar la cuenta y todos sus datos (confirma con la contraseña)
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [password], properties: { password: { type: string } } } } }
+      responses:
+        '204': { description: Eliminada }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /users/me/password:
+    patch:
+      tags: [Usuarios]
+      summary: Cambiar contraseña (cierra las demás sesiones y devuelve un token nuevo)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [currentPassword, newPassword]
+              properties: { currentPassword: { type: string }, newPassword: { type: string, minLength: 8 } }
+      responses:
+        '200': { description: Contraseña actualizada }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /categories:
+    get:
+      tags: [Categorías]
+      summary: Listar categorías
+      parameters:
+        - { in: query, name: type, schema: { $ref: '#/components/schemas/Type' } }
+      responses:
+        '200': { description: OK }
+    post:
+      tags: [Categorías]
+      summary: Crear categoría
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CategoryInput' }
+            example: { name: Mascotas, type: EXPENSE }
+      responses:
+        '201': { description: Creada }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /categories/{id}:
+    parameters: [{ $ref: '#/components/parameters/Id' }]
+    get:
+      tags: [Categorías]
+      summary: Consultar categoría
+      responses:
+        '200': { description: OK }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [Categorías]
+      summary: Actualizar categoría
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/CategoryInput' } } }
+      responses:
+        '200': { description: Actualizada }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+    delete:
+      tags: [Categorías]
+      summary: Eliminar categoría (409 si tiene transacciones o presupuestos)
+      responses:
+        '204': { description: Eliminada }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /transactions:
+    get:
+      tags: [Transacciones]
+      summary: Listar con filtros, orden y paginación (incluye totales)
+      parameters:
+        - { in: query, name: page, schema: { type: integer, minimum: 1, default: 1 } }
+        - { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+        - { in: query, name: type, schema: { $ref: '#/components/schemas/Type' } }
+        - { in: query, name: categoryId, schema: { type: string, format: uuid } }
+        - { in: query, name: from, schema: { type: string, format: date } }
+        - { in: query, name: to, schema: { type: string, format: date } }
+        - { in: query, name: minAmount, schema: { type: number } }
+        - { in: query, name: maxAmount, schema: { type: number } }
+        - { in: query, name: search, description: Busca en la descripción, schema: { type: string } }
+        - { in: query, name: sortBy, schema: { type: string, enum: [date, amount, createdAt], default: date } }
+        - { in: query, name: order, schema: { type: string, enum: [asc, desc], default: desc } }
+      responses:
+        '200': { description: OK }
+        '400': { $ref: '#/components/responses/ValidationError' }
+    post:
+      tags: [Transacciones]
+      summary: Registrar ingreso o gasto (el tipo se toma de la categoría)
+      description: Si es un gasto, la respuesta incluye en `alerts` las alertas generadas (80 %, 100 % o gasto atípico).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TransactionInput' }
+            example: { categoryId: 3fa85f64-5717-4562-b3fc-2c963f66afa6, amount: 150000, date: '2026-10-02', description: Mercado }
+      responses:
+        '201': { description: Creada }
+        '400':
+          description: Datos inválidos
+          content:
+            application/json:
+              example: { error: { code: VALIDATION_ERROR, message: Ingrese un monto positivo, details: [{ field: body.amount, message: Ingrese un monto positivo }] } }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /transactions/{id}:
+    parameters: [{ $ref: '#/components/parameters/Id' }]
+    get:
+      tags: [Transacciones]
+      summary: Consultar transacción
+      responses:
+        '200': { description: OK }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [Transacciones]
+      summary: Actualizar transacción (campos parciales)
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/TransactionInput' } } }
+      responses:
+        '200': { description: Actualizada }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Transacciones]
+      summary: Eliminar transacción
+      responses:
+        '204': { description: Eliminada }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /budgets:
+    get:
+      tags: [Presupuestos]
+      summary: Listar presupuestos con gastado, disponible, % y estado
+      parameters:
+        - { in: query, name: page, schema: { type: integer, default: 1 } }
+        - { in: query, name: limit, schema: { type: integer, default: 20 } }
+        - { in: query, name: categoryId, schema: { type: string, format: uuid } }
+        - { in: query, name: activeOn, description: Presupuestos vigentes en esa fecha, schema: { type: string, format: date } }
+        - { in: query, name: status, schema: { type: string, enum: [OK, WARNING, EXCEEDED] } }
+      responses:
+        '200': { description: OK }
+    post:
+      tags: [Presupuestos]
+      summary: Crear presupuesto (usar `month` o `periodStart`/`periodEnd`)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BudgetInput' }
+            examples:
+              mensual: { value: { categoryId: 3fa85f64-5717-4562-b3fc-2c963f66afa6, amountLimit: 500000, month: '2026-10' } }
+              rango: { value: { categoryId: 3fa85f64-5717-4562-b3fc-2c963f66afa6, amountLimit: 120000, periodStart: '2026-10-01', periodEnd: '2026-10-15' } }
+      responses:
+        '201': { description: Creado }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { description: Ya existe un presupuesto solapado para esa categoría }
+
+  /budgets/{id}:
+    parameters: [{ $ref: '#/components/parameters/Id' }]
+    get:
+      tags: [Presupuestos]
+      summary: Consultar presupuesto
+      responses:
+        '200': { description: OK }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [Presupuestos]
+      summary: Actualizar presupuesto
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/BudgetInput' } } }
+      responses:
+        '200': { description: Actualizado }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { description: Periodo solapado }
+    delete:
+      tags: [Presupuestos]
+      summary: Eliminar presupuesto
+      responses:
+        '204': { description: Eliminado }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /budgets/{id}/analysis:
+    parameters:
+      - { $ref: '#/components/parameters/Id' }
+      - { $ref: '#/components/parameters/GroupBy' }
+      - { $ref: '#/components/parameters/AsOf' }
+    get:
+      tags: [Análisis inteligente]
+      summary: Análisis completo del presupuesto
+      description: |
+        Calcula gastado, disponible, % consumido y estado (OK < 80 %, WARNING 80–99 %, EXCEEDED ≥ 100 %),
+        ritmo de gasto, proyección al final del periodo, gasto diario recomendado, fecha estimada de agotamiento,
+        desglose por día/semana/mes, gastos principales, mensajes en lenguaje natural y alertas.
+      responses:
+        '200': { description: Análisis, content: { application/json: { schema: { $ref: '#/components/schemas/BudgetAnalysis' } } } }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /budgets/{id}/report:
+    parameters:
+      - { $ref: '#/components/parameters/Id' }
+      - { $ref: '#/components/parameters/GroupBy' }
+      - { $ref: '#/components/parameters/AsOf' }
+    get:
+      tags: [Análisis inteligente, Reportes]
+      summary: Reporte Excel del presupuesto (Resumen, Desglose, Movimientos, Alertas)
+      responses:
+        '200':
+          description: Archivo .xlsx
+          content: { application/vnd.openxmlformats-officedocument.spreadsheetml.sheet: { schema: { type: string, format: binary } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /reports/monthly:
+    get:
+      tags: [Reportes]
+      summary: Reporte Excel mensual (Resumen, Por categoría, Presupuestos, Movimientos, Alertas)
+      parameters:
+        - { in: query, name: month, schema: { type: string, example: '2026-10' } }
+      responses:
+        '200':
+          description: Archivo .xlsx
+          content: { application/vnd.openxmlformats-officedocument.spreadsheetml.sheet: { schema: { type: string, format: binary } } }
+        '400': { $ref: '#/components/responses/ValidationError' }
+
+  /analytics/monthly:
+    get:
+      tags: [Estadísticas]
+      summary: Resumen del mes (ingresos, gastos, balance, tasa de ahorro, top categorías)
+      parameters: [{ in: query, name: month, schema: { type: string, example: '2026-10' } }]
+      responses: { '200': { description: OK } }
+
+  /analytics/categories:
+    get:
+      tags: [Estadísticas]
+      summary: Distribución por categoría en un rango de fechas
+      parameters:
+        - { in: query, name: from, schema: { type: string, format: date } }
+        - { in: query, name: to, schema: { type: string, format: date } }
+        - { in: query, name: type, schema: { $ref: '#/components/schemas/Type' } }
+      responses: { '200': { description: OK } }
+
+  /analytics/comparison:
+    get:
+      tags: [Estadísticas]
+      summary: Comparación con el mes anterior, por categoría, con observaciones
+      parameters: [{ in: query, name: month, schema: { type: string, example: '2026-10' } }]
+      responses: { '200': { description: OK } }
+
+  /analytics/trend:
+    get:
+      tags: [Estadísticas]
+      summary: Serie mensual de ingresos y gastos
+      parameters:
+        - { in: query, name: months, schema: { type: integer, default: 6, maximum: 24 } }
+        - { in: query, name: until, schema: { type: string, example: '2026-10' } }
+      responses: { '200': { description: OK } }
+
+  /predictions/expenses:
+    get:
+      tags: [Predicciones]
+      summary: Predicción del gasto total del mes (o evaluación si el mes ya terminó)
+      description: |
+        Mes en curso: modelo `runrate-v1` (ritmo de gasto) o `blend-v1` (ritmo + promedio de meses anteriores
+        cuando hay al menos 3 meses de historial). Cada cálculo se guarda para ver su evolución.
+        Mes terminado: compara las predicciones guardadas con el gasto real (error y MAPE).
+      parameters:
+        - { in: query, name: month, schema: { type: string, example: '2026-10' } }
+        - { $ref: '#/components/parameters/AsOf' }
+      responses:
+        '200': { description: OK }
+        '400': { $ref: '#/components/responses/ValidationError' }
+
+  /predictions/accuracy:
+    get:
+      tags: [Predicciones]
+      summary: Error de las predicciones en los meses finalizados (MAPE)
+      parameters:
+        - { in: query, name: months, schema: { type: integer, default: 6 } }
+        - { in: query, name: until, schema: { type: string, example: '2026-09' } }
+      responses: { '200': { description: OK } }
+
+  /alerts:
+    get:
+      tags: [Alertas]
+      summary: Listar alertas
+      parameters:
+        - { in: query, name: unread, schema: { type: string, enum: ['true', 'false'] } }
+        - { in: query, name: type, schema: { type: string, enum: [BUDGET_WARNING, BUDGET_EXCEEDED, UNUSUAL_EXPENSE] } }
+        - { in: query, name: page, schema: { type: integer, default: 1 } }
+        - { in: query, name: limit, schema: { type: integer, default: 20 } }
+      responses: { '200': { description: OK } }
+
+  /alerts/read-all:
+    patch:
+      tags: [Alertas]
+      summary: Marcar todas como leídas
+      responses: { '200': { description: OK } }
+
+  /alerts/{id}/read:
+    parameters: [{ $ref: '#/components/parameters/Id' }]
+    patch:
+      tags: [Alertas]
+      summary: Marcar una alerta como leída
+      responses:
+        '200': { description: OK }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /alerts/{id}:
+    parameters: [{ $ref: '#/components/parameters/Id' }]
+    delete:
+      tags: [Alertas]
+      summary: Eliminar alerta
+      responses:
+        '204': { description: Eliminada }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }
+
+  parameters:
+    Id: { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+    GroupBy: { in: query, name: groupBy, schema: { type: string, enum: [day, week, month], default: week } }
+    AsOf: { in: query, name: asOf, description: 'Fecha de referencia del análisis (por defecto hoy)', schema: { type: string, format: date } }
+
+  responses:
+    ValidationError:
+      description: Datos inválidos
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    Unauthorized:
+      description: Token ausente, inválido, expirado o revocado
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    NotFound:
+      description: No existe o pertenece a otro usuario
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    Conflict:
+      description: Conflicto con datos existentes
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    TooManyRequests:
+      description: Demasiados intentos
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+
+  schemas:
+    Type: { type: string, enum: [INCOME, EXPENSE] }
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code: { type: string, example: VALIDATION_ERROR }
+            message: { type: string, example: Ingrese un monto positivo }
+            details: { type: array, items: { type: object, properties: { field: { type: string }, message: { type: string } } } }
+            requestId: { type: string }
+    RegisterInput:
+      type: object
+      required: [name, email, password]
+      properties:
+        name: { type: string, minLength: 2, maxLength: 100 }
+        email: { type: string, format: email }
+        password: { type: string, minLength: 8, maxLength: 72, description: Debe incluir letras y números }
+    LoginInput:
+      type: object
+      required: [email, password]
+      properties: { email: { type: string, format: email }, password: { type: string } }
+    User:
+      type: object
+      properties: { id: { type: string, format: uuid }, name: { type: string }, email: { type: string }, createdAt: { type: string, format: date-time } }
+    AuthResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            user: { $ref: '#/components/schemas/User' }
+            token: { type: string }
+            tokenType: { type: string, example: Bearer }
+            expiresAt: { type: string, format: date-time }
+    CategoryInput:
+      type: object
+      required: [name, type]
+      properties: { name: { type: string, minLength: 2, maxLength: 60 }, type: { $ref: '#/components/schemas/Type' } }
+    TransactionInput:
+      type: object
+      required: [categoryId, amount, date]
+      properties:
+        categoryId: { type: string, format: uuid }
+        amount: { type: number, minimum: 0.01, maximum: 999999999999.99, description: 'Positivo, máximo 2 decimales' }
+        date: { type: string, format: date }
+        description: { type: string, maxLength: 255, nullable: true }
+    BudgetInput:
+      type: object
+      required: [categoryId, amountLimit]
+      properties:
+        categoryId: { type: string, format: uuid, description: Categoría de tipo EXPENSE }
+        amountLimit: { type: number, minimum: 0.01 }
+        month: { type: string, example: '2026-10', description: Atajo para todo el mes }
+        periodStart: { type: string, format: date }
+        periodEnd: { type: string, format: date }
+    BudgetAnalysis:
+      type: object
+      example:
+        data:
+          summary: { limit: 500000, spent: 450000, remaining: 50000, percentageUsed: 90, status: WARNING, transactionCount: 3 }
+          period: { start: '2026-10-01', end: '2026-10-31', asOf: '2026-10-20', state: IN_PROGRESS, totalDays: 31, elapsedDays: 20, remainingDays: 11 }
+          pace: { dailyAverage: 22500, projectedSpend: 697500, projectedPercentage: 139.5, projectedStatus: EXCEEDED, recommendedDailySpend: 4545.45 }
+          messages:
+            - { level: WARNING, code: BUDGET_WARNING, message: 'Has consumido el 90% del presupuesto de Alimentación. Te quedan $ 50.000.' }

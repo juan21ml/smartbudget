@@ -1,0 +1,41 @@
+# Integración continua: en cada push o pull request ejecuta todas las pruebas
+# (unitarias, integración y seguridad) contra un PostgreSQL real.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: smartbudget
+          POSTGRES_PASSWORD: smartbudget
+          POSTGRES_DB: smartbudget_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U smartbudget" --health-interval 5s --health-timeout 3s --health-retries 10
+
+    env:
+      TEST_DATABASE_URL: postgresql://smartbudget:smartbudget@localhost:5432/smartbudget_test
+      TEST_DB_SSL: 'false'
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - run: npm audit --omit=dev --audit-level=high
+      - run: npm test

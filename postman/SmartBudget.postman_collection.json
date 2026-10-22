@@ -1849,7 +1849,7 @@
           ]
         },
         {
-          "name": "Inyección SQL en búsqueda (texto literal)",
+          "name": "Inyección SQL en búsqueda (bloqueada)",
           "request": {
             "method": "GET",
             "header": [],
@@ -1867,7 +1867,8 @@
                   "value": "'%20OR%201%3D1%3B%20DROP%20TABLE%20users%3B%20--"
                 }
               ]
-            }
+            },
+            "description": "En local la API la trata como texto (200 sin resultados). En Render el firewall (WAF) la bloquea antes de llegar a la API (403)."
           },
           "event": [
             {
@@ -1875,15 +1876,17 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
-                  "pm.test('No devuelve resultados', () => pm.expect(pm.response.json().data).to.have.lengthOf(0));"
+                  "const code = pm.response.code;",
+                  "pm.test('Bloqueada por el WAF (403) o tratada como texto por la API (200)', () => pm.expect(code).to.be.oneOf([200, 403]));",
+                  "if (code === 200) pm.test('La API no devuelve resultados', () => pm.expect(pm.response.json().data).to.have.lengthOf(0));",
+                  "else pm.test('Bloqueada antes de llegar a la API (firewall de la nube)', () => pm.expect(code).to.eql(403));"
                 ]
               }
             }
           ]
         },
         {
-          "name": "Parámetro de orden malicioso (400)",
+          "name": "Parámetro de orden malicioso (bloqueado)",
           "request": {
             "method": "GET",
             "header": [],
@@ -1901,7 +1904,8 @@
                   "value": "amount%3BDROP%20TABLE%20users"
                 }
               ]
-            }
+            },
+            "description": "En local la API lo rechaza por validación (400). En Render el firewall (WAF) lo bloquea antes (403)."
           },
           "event": [
             {
@@ -1909,7 +1913,7 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('Status 400', () => pm.response.to.have.status(400));"
+                  "pm.test('Rechazado por la API (400) o bloqueado por el WAF (403)', () => pm.expect(pm.response.code).to.be.oneOf([400, 403]));"
                 ]
               }
             }

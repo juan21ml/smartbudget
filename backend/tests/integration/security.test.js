@@ -302,6 +302,16 @@ describe('Seguridad · fuerza bruta, cabeceras, CORS y errores', () => {
     expect(evil.headers['access-control-allow-origin']).toBeUndefined();
   });
 
+  it('CORS: Swagger UI (mismo dominio de la API) puede llamar a la API', async () => {
+    const res = await api()
+      .post('/api/v1/auth/login')
+      .set('Host', 'api.ejemplo.com')
+      .set('Origin', 'http://api.ejemplo.com')
+      .send({ email: 'nadie@test.com', password: 'Incorrecta1' });
+    expect(res.status).toBe(401);
+    expect(res.headers['access-control-allow-origin']).toBe('http://api.ejemplo.com');
+  });
+
   it('rutas inexistentes → 404 con formato de error uniforme', async () => {
     const res = await api().get('/api/v1/admin');
     expect(res.status).toBe(404);

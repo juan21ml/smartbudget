@@ -60,16 +60,21 @@ export function createApp(options = {}) {
   app.use(helmet());
 
   app.use(
-    cors({
-      origin(origin, callback) {
-        // Sin origin = Postman, curl o llamadas servidor a servidor
-        if (!origin || config.corsOrigins.includes(origin)) return callback(null, true);
+    cors((req, callback) => {
+      const origin = req.get('origin');
+      // Permitido: sin origin (Postman, curl, servidor a servidor), la propia API
+      // (Swagger UI se sirve desde el mismo dominio) o un origen de CORS_ORIGINS.
+      const sameOrigin = origin !== undefined && origin === `${req.protocol}://${req.get('host')}`;
+      if (origin && !sameOrigin && !config.corsOrigins.includes(origin)) {
         return callback(new Error('CORS_NOT_ALLOWED'));
-      },
-      methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
-      allowedHeaders: ['Content-Type', 'Authorization'],
-      exposedHeaders: ['Content-Disposition', 'X-Request-Id'],
-      maxAge: 600,
+      }
+      return callback(null, {
+        origin: Boolean(origin),
+        methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+        allowedHeaders: ['Content-Type', 'Authorization'],
+        exposedHeaders: ['Content-Disposition', 'X-Request-Id'],
+        maxAge: 600,
+      });
     }),
   );
 
@@ -87,6 +92,9 @@ export function createApp(options = {}) {
   const api = express.Router();
   const authLimiter = createAuthLimiter({ max: config.authRateLimitMax, windowMin: config.authRateLimitWindowMin });
 
+  api.get('/', (_req, res) =>
+    res.json({ name: 'SmartBudget API', version: 'v1', docs: '/api/v1/docs', health: '/api/v1/health' }),
+  );
   api.use('/health', healthRoutes());
   api.use('/auth', authRoutes({ authLimiter }));
 

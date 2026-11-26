@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { amountSchema, dateSchema, nonEmpty, paginationSchema, typeSchema, uuidSchema } from '../../utils/schemas.js';
 
 const descriptionSchema = z
-  .string({ invalid_type_error: 'La descripción debe ser texto' })
+  .string({ error: (i) => (i.input === undefined ? undefined : 'La descripción debe ser texto') })
   .trim()
   .max(255, 'La descripción no puede superar 255 caracteres')
   .nullable();
@@ -31,9 +31,9 @@ export const listTransactionsQuery = z
     maxAmount: z.coerce.number().positive('maxAmount debe ser positivo').optional(),
     search: z.string().trim().max(100).optional(),
     sortBy: z
-      .enum(['date', 'amount', 'createdAt'], { errorMap: () => ({ message: "sortBy debe ser 'date', 'amount' o 'createdAt'" }) })
+      .enum(['date', 'amount', 'createdAt'], { error: "sortBy debe ser 'date', 'amount' o 'createdAt'" })
       .default('date'),
-    order: z.enum(['asc', 'desc'], { errorMap: () => ({ message: "order debe ser 'asc' o 'desc'" }) }).default('desc'),
+    order: z.enum(['asc', 'desc'], { error: "order debe ser 'asc' o 'desc'" }).default('desc'),
   })
   .refine((q) => !q.from || !q.to || q.from <= q.to, { message: "'from' debe ser anterior o igual a 'to'", path: ['from'] })
   .refine((q) => q.minAmount === undefined || q.maxAmount === undefined || q.minAmount <= q.maxAmount, {

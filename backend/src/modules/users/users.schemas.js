@@ -5,7 +5,10 @@ export const updateProfileSchema = z.object({ name: nameSchema }).strict();
 
 export const changePasswordSchema = z
   .object({
-    currentPassword: z.string({ required_error: 'La contraseña actual es obligatoria' }).min(1).max(72),
+    currentPassword: z
+      .string({ error: (i) => (i.input === undefined ? 'La contraseña actual es obligatoria' : undefined) })
+      .min(1)
+      .max(72),
     newPassword: passwordSchema,
   })
   .strict()
@@ -16,6 +19,9 @@ export const changePasswordSchema = z
 
 export const deleteAccountSchema = z
   .object({
-    password: z.string({ required_error: 'Confirme con su contraseña' }).min(1, 'Confirme con su contraseña').max(72),
+    password: z
+      .string({ error: (i) => (i.input === undefined ? 'Confirme con su contraseña' : undefined) })
+      .min(1, 'Confirme con su contraseña')
+      .max(72),
   })
   .strict();

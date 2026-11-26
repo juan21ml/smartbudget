@@ -7,13 +7,12 @@ import * as service from './alerts.service.js';
 const listQuery = z.object({
   ...paginationSchema,
   unread: z
-    .enum(['true', 'false'], { errorMap: () => ({ message: "unread debe ser 'true' o 'false'" }) })
+    .enum(['true', 'false'], { error: "unread debe ser 'true' o 'false'" })
     .transform((v) => v === 'true')
     .optional(),
   type: z
-    .enum(['BUDGET_WARNING', 'BUDGET_EXCEEDED', 'UNUSUAL_EXPENSE'], {
-      errorMap: () => ({ message: "type debe ser 'BUDGET_WARNING', 'BUDGET_EXCEEDED' o 'UNUSUAL_EXPENSE'" }),
-    })
+    .enum(['BUDGET_WARNING', 'BUDGET_EXCEEDED', 'UNUSUAL_EXPENSE'],
+       { error: "type debe ser 'BUDGET_WARNING', 'BUDGET_EXCEEDED' o 'UNUSUAL_EXPENSE'" })
     .optional(),
 });
 

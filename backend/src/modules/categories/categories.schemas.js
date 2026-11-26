@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { nonEmpty, typeSchema } from '../../utils/schemas.js';
 
 const nameSchema = z
-  .string({ required_error: 'El nombre es obligatorio' })
+  .string({ error: (i) => (i.input === undefined ? 'El nombre es obligatorio' : undefined) })
   .trim()
   .min(2, 'El nombre debe tener al menos 2 caracteres')
   .max(60, 'El nombre no puede superar 60 caracteres');

@@ -57,7 +57,7 @@ export const listBudgetsQuery = z.object({
 
 export const analysisQuery = z.object({
   groupBy: z
-    .enum(['day', 'week', 'month'], { errorMap: () => ({ message: "groupBy debe ser 'day', 'week' o 'month'" }) })
+    .enum(['day', 'week', 'month'], { error: "groupBy debe ser 'day', 'week' o 'month'" })
     .default('week'),
   // Fecha de referencia del análisis. Por defecto: hoy (zona horaria de la app).
   asOf: dateSchema.optional(),

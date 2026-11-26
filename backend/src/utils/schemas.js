@@ -7,16 +7,18 @@ export const MAX_AMOUNT = 999_999_999_999.99; // límite de NUMERIC(14,2)
 
 export const amountSchema = z
   .number({
-    required_error: 'El monto es obligatorio',
-    invalid_type_error: 'El monto debe ser un número',
+    error: (issue) =>
+      issue.input === undefined ? 'El monto es obligatorio' : 'El monto debe ser un número',
   })
-  .finite('El monto debe ser un número')
   .positive('Ingrese un monto positivo')
   .max(MAX_AMOUNT, 'El monto excede el máximo permitido')
   .refine((n) => Math.abs(n * 100 - Math.round(n * 100)) < 1e-6, 'El monto admite máximo 2 decimales');
 
 export const dateSchema = z
-  .string({ required_error: 'La fecha es obligatoria', invalid_type_error: 'La fecha debe ser texto' })
+  .string({
+    error: (issue) =>
+      issue.input === undefined ? 'La fecha es obligatoria' : 'La fecha debe ser texto',
+  })
   .refine(isValidDate, 'La fecha debe tener formato YYYY-MM-DD y ser válida');
 
 export const monthSchema = z
@@ -28,7 +30,7 @@ export const uuidSchema = z.string().uuid('El identificador no es válido');
 export const idParamsSchema = z.object({ id: uuidSchema });
 
 export const typeSchema = z.enum(['INCOME', 'EXPENSE'], {
-  errorMap: () => ({ message: "El tipo debe ser 'INCOME' o 'EXPENSE'" }),
+  error: "El tipo debe ser 'INCOME' o 'EXPENSE'",
 });
 
 export const paginationSchema = {

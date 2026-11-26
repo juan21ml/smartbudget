@@ -3,6 +3,11 @@
 API REST de análisis de gastos y presupuestos inteligentes · Cloud Computing · Ingeniería de Sistemas
 **Grupo 3:** Juan José Martínez Lotero, Fabián Esteban Guevara
 
+
+**Aplicación web:** https://smartbudget-psi-five.vercel.app (botón «Usar la cuenta de demostración»)
+**API:** https://smartbudget-400w.onrender.com/api/v1 · Swagger: https://smartbudget-400w.onrender.com/api/v1/docs
+
+
 Permite registrar ingresos y gastos, definir presupuestos por categoría y periodo, y **analizarlos de forma inteligente**: mide el consumo, proyecta el gasto al final del periodo, genera alertas automáticas (80 %, 100 % y gastos atípicos), estima el gasto del mes y exporta reportes en Excel.
 
 | | |
@@ -209,13 +214,8 @@ GitHub Actions ejecuta la suite completa en cada push (`.github/workflows/ci.yml
 |---|---|---|
 | Base de datos | Supabase | `npm run migrate` con la `DATABASE_URL` de Supabase |
 | Backend | Render (Web Service, Docker) | Dockerfile `backend/Dockerfile`, contexto: raíz del repo |
+| Frontend | Vercel | Root Directory `frontend`, variable `VITE_API_URL` apuntando a la API de Render |
 | CI | GitHub Actions | Pruebas en cada push |
-
-Variables de entorno en Render: `NODE_ENV=production`, `DATABASE_URL`, `DB_SSL=true`, `JWT_SECRET`, `CORS_ORIGINS`, `TRUST_PROXY=1` (Render pone un proxy delante; sin esto el rate limit no ve la IP real). El contenedor aplica las migraciones pendientes al arrancar.
-
-Antes de desplegar, revisa las condiciones actuales del plan gratuito de Render y de Supabase (por ejemplo, suspensión por inactividad, que hace lenta la primera petición de la demo).
-
----
 
 ## 7. Arquitectura
 
